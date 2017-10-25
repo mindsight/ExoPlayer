@@ -26,6 +26,7 @@ import android.os.SystemClock;
 import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
 import android.util.Log;
+
 import com.google.android.exoplayer2.BaseRenderer;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -50,12 +51,28 @@ import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
 /**
  * An abstract renderer that uses {@link MediaCodec} to decode samples for rendering.
  */
 @TargetApi(16)
 public abstract class MediaCodecRenderer extends BaseRenderer {
+
+  // INSIDE SECURE BEGIN: Added MediaCodecFacade interface, added MediaCodecFacade member field, added setter of MediaCodecFacade
+  public interface MediaCodecFacade {
+      void mediaCodecCreated(MediaCodec var1);
+
+      void setupInputBuffers(ByteBuffer[] inputBuffers);
+
+      void queueSecureInputBuffer(int var1, int var2, MediaCodec.CryptoInfo var3, long var4, int var6);
+
+      void queueInputBuffer(int var1, int var2, int var3, long var4, int var6);
+  }
+  public void setMediaCodecFacade(final MediaCodecFacade mediaCodecFacade)
+  {
+    this.mediaCodecFacade = mediaCodecFacade;
+  }
+  private MediaCodecFacade mediaCodecFacade;
+  // INSIDE SECURE END
 
   /**
    * Thrown when a failure occurs instantiating a decoder.
@@ -388,6 +405,12 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       TraceUtil.beginSection("createCodec:" + codecName);
       codec = MediaCodec.createByCodecName(codecName);
       TraceUtil.endSection();
+      // INSIDE SECURE BEGIN: Added call-out to the facade for the created codec
+      if (mediaCodecFacade != null)
+      {
+        mediaCodecFacade.mediaCodecCreated( codec );
+      }
+      // INSIDE SECURE END
       TraceUtil.beginSection("configureCodec");
       configureCodec(codecInfo, codec, format, wrappedMediaCrypto);
       TraceUtil.endSection();
@@ -398,6 +421,12 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       onCodecInitialized(codecName, codecInitializedTimestamp,
           codecInitializedTimestamp - codecInitializingTimestamp);
       inputBuffers = codec.getInputBuffers();
+      // INSIDE SECURE BEGIN: Added call-out to the facade to setup the input buffers
+      if (mediaCodecFacade != null)
+      {
+        mediaCodecFacade.setupInputBuffers(inputBuffers);
+      }
+      // INSIDE SECURE END
       outputBuffers = codec.getOutputBuffers();
     } catch (Exception e) {
       throwDecoderInitError(new DecoderInitializationException(format, e,
@@ -626,7 +655,16 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         // Do nothing.
       } else {
         codecReceivedEos = true;
-        codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+        // INSIDE SECURE BEGIN: Added call to facade to queue input buffer when needed
+        if (mediaCodecFacade == null)
+        {
+          codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+        }
+        else
+        {
+          mediaCodecFacade.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+        }
+        // INSIDE SECURE END
         inputIndex = C.INDEX_UNSET;
       }
       codecReinitializationState = REINITIALIZATION_STATE_WAIT_END_OF_STREAM;
@@ -636,7 +674,16 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     if (codecNeedsAdaptationWorkaroundBuffer) {
       codecNeedsAdaptationWorkaroundBuffer = false;
       buffer.data.put(ADAPTATION_WORKAROUND_BUFFER);
-      codec.queueInputBuffer(inputIndex, 0, ADAPTATION_WORKAROUND_BUFFER.length, 0, 0);
+      // INSIDE SECURE BEGIN: Added call to facade to queue input buffer when needed
+      if (mediaCodecFacade == null)
+      {
+        codec.queueInputBuffer(inputIndex, 0, ADAPTATION_WORKAROUND_BUFFER.length, 0, 0);
+      }
+      else
+      {
+        mediaCodecFacade.queueInputBuffer(inputIndex, 0, ADAPTATION_WORKAROUND_BUFFER.length, 0, 0);
+      }
+      // INSIDE SECURE END
       inputIndex = C.INDEX_UNSET;
       codecReceivedBuffers = true;
       return true;
@@ -694,7 +741,16 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           // Do nothing.
         } else {
           codecReceivedEos = true;
-          codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+          // INSIDE SECURE BEGIN: Added call to facade to queue input buffer when needed
+          if (mediaCodecFacade == null)
+          {
+            codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+          }
+          else
+          {
+            mediaCodecFacade.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+          }
+          // INSIDE SECURE END
           inputIndex = C.INDEX_UNSET;
         }
       } catch (CryptoException e) {
@@ -736,9 +792,28 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       if (bufferEncrypted) {
         MediaCodec.CryptoInfo cryptoInfo = getFrameworkCryptoInfo(buffer,
             adaptiveReconfigurationBytes);
-        codec.queueSecureInputBuffer(inputIndex, 0, cryptoInfo, presentationTimeUs, 0);
+        // INSIDE SECURE BEGIN: Added call to facade to queue input buffer when needed
+        if (mediaCodecFacade == null)
+        {
+          codec.queueSecureInputBuffer(inputIndex, 0, cryptoInfo, presentationTimeUs, 0);
+        }
+        else
+        {
+          mediaCodecFacade.queueSecureInputBuffer(inputIndex, 0, cryptoInfo, presentationTimeUs, 0);
+        }
+        // INSIDE SECURE END
       } else {
         codec.queueInputBuffer(inputIndex, 0, buffer.data.limit(), presentationTimeUs, 0);
+        // INSIDE SECURE BEGIN: Added call to facade to queue input buffer when needed
+        if (mediaCodecFacade == null)
+        {
+          codec.queueInputBuffer(inputIndex, 0, buffer.data.limit(), presentationTimeUs, 0);
+        }
+        else
+        {
+          mediaCodecFacade.queueInputBuffer(inputIndex, 0, buffer.data.limit(), presentationTimeUs, 0);
+        }
+        // INSIDE SECURE END
       }
       inputIndex = C.INDEX_UNSET;
       codecReceivedBuffers = true;
@@ -1013,6 +1088,8 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   private void processOutputFormat() throws ExoPlaybackException {
     MediaFormat format = codec.getOutputFormat();
     if (codecAdaptationWorkaroundMode != ADAPTATION_WORKAROUND_MODE_NEVER
+        && format.containsKey(MediaFormat.KEY_WIDTH)
+        && format.containsKey(MediaFormat.KEY_HEIGHT)
         && format.getInteger(MediaFormat.KEY_WIDTH) == ADAPTATION_WORKAROUND_SLICE_WIDTH_HEIGHT
         && format.getInteger(MediaFormat.KEY_HEIGHT) == ADAPTATION_WORKAROUND_SLICE_WIDTH_HEIGHT) {
       // We assume this format changed event was caused by the adaptation workaround.

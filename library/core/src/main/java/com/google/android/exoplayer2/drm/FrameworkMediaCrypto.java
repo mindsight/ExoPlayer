@@ -23,9 +23,10 @@ import com.google.android.exoplayer2.util.Assertions;
  * An {@link ExoMediaCrypto} implementation that wraps the framework {@link MediaCrypto}.
  */
 @TargetApi(16)
-public final class FrameworkMediaCrypto implements ExoMediaCrypto {
+public class FrameworkMediaCrypto implements ExoMediaCrypto {// INSIDE SECURE SINGLE LINE: REMOVED final below
 
-  private final MediaCrypto mediaCrypto;
+  // INSIDE SECURE BEGIN: Removed final on mediaCrypto, removed assertionCheck for null
+  private MediaCrypto mediaCrypto;
   private final boolean forceAllowInsecureDecoderComponents;
 
   /**
@@ -44,8 +45,9 @@ public final class FrameworkMediaCrypto implements ExoMediaCrypto {
    */
   public FrameworkMediaCrypto(MediaCrypto mediaCrypto,
       boolean forceAllowInsecureDecoderComponents) {
-    this.mediaCrypto = Assertions.checkNotNull(mediaCrypto);
+    this.mediaCrypto = mediaCrypto;
     this.forceAllowInsecureDecoderComponents = forceAllowInsecureDecoderComponents;
+  // INSIDE SECURE END
   }
 
   /**
